@@ -11,3 +11,5 @@ secret.js
 .env.test.local
 .env.production.local
 .env
+
+.pem
