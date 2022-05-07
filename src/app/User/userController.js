@@ -2,11 +2,12 @@ const jwtMiddleware = require("../../../config/jwtMiddleware");
 const userProvider = require("../../app/User/userProvider");
 const userService = require("../../app/User/userService");
 const baseResponse = require("../../../config/baseResponseStatus");
-const {response, errResponse} = require("../../../config/response");
+const { response, errResponse } = require("../../../config/response");
 
 const regexEmail = require("regex-email");
-const {emit} = require("nodemon");
+const { emit } = require("nodemon");
 
+const postProvider = require("../Post/postProvider");
 /**
  * API No. 0
  * API Name : 테스트 API
@@ -22,15 +23,13 @@ const {emit} = require("nodemon");
  * [POST] /app/users
  */
 exports.postUsers = async function (req, res) {
-
     /**
      * Body: email, password, nickname
      */
-    const {email, password, nickname} = req.body;
+    const { email, password, nickname } = req.body;
 
     // 빈 값 체크
-    if (!email)
-        return res.send(response(baseResponse.SIGNUP_EMAIL_EMPTY));
+    if (!email) return res.send(response(baseResponse.SIGNUP_EMAIL_EMPTY));
 
     // 길이 체크
     if (email.length > 30)
@@ -41,7 +40,6 @@ exports.postUsers = async function (req, res) {
         return res.send(response(baseResponse.SIGNUP_EMAIL_ERROR_TYPE));
 
     // 기타 등등 - 추가하기
-
 
     const signUpResponse = await userService.createUser(
         email,
@@ -58,7 +56,6 @@ exports.postUsers = async function (req, res) {
  * [GET] /app/users
  */
 exports.getUsers = async function (req, res) {
-
     /**
      * Query String: email
      */
@@ -80,23 +77,29 @@ exports.getUsers = async function (req, res) {
     API Name: 유저 상세 조회 API
     [GET] /users/:userIdx
 */
-exports.getUser = async function (req, res) {
+exports.getUserFeed = async function (req, res) {
     /*
         Path Variable: userIdx
     */
     const userIdx = req.params.userIdx;
 
     // validation
-    if(!userIdx) {
+    if (!userIdx) {
         return res.send(errResponse(baseResponse.USER_USERIDX_EMPTY));
-    } 
+    }
     if (userIdx <= 0) {
         return res.send(errResponse(baseResponse.USER_USERIDX_LENGTH));
     }
 
-    const userIdxResult = await userProvider.retrieveUser(userIdx);
-    return res.send(response(baseResponse.SUCCESS, userIdxResult))
-}
+    const userInfo = await userProvider.retrieveUserInfo(userIdx);
+    const userPosts = await postProvider.retrieveUserPosts(userIdx);
+    return res.send(
+        response(baseResponse.SUCCESS, {
+            userInfo,
+            userPosts,
+        })
+    );
+};
 
 /**
  * API No. 3
@@ -104,7 +107,6 @@ exports.getUser = async function (req, res) {
  * [GET] /app/users/{userId}
  */
 exports.getUserById = async function (req, res) {
-
     /**
      * Path Variable: userId
      */
@@ -116,7 +118,6 @@ exports.getUserById = async function (req, res) {
     return res.send(response(baseResponse.SUCCESS, userByUserId));
 };
 
-
 // TODO: After 로그인 인증 방법 (JWT)
 /**
  * API No. 4
@@ -125,8 +126,7 @@ exports.getUserById = async function (req, res) {
  * body : email, passsword
  */
 exports.login = async function (req, res) {
-
-    const {email, password} = req.body;
+    const { email, password } = req.body;
 
     // TODO: email, password 형식적 Validation
 
@@ -134,7 +134,6 @@ exports.login = async function (req, res) {
 
     return res.send(signInResponse);
 };
-
 
 /**
  * API No. 5
@@ -144,10 +143,9 @@ exports.login = async function (req, res) {
  * body : nickname
  */
 exports.patchUsers = async function (req, res) {
-
     // jwt - userId, path variable :userId
 
-    const userIdFromJWT = req.verifiedToken.userId
+    const userIdFromJWT = req.verifiedToken.userId;
 
     const userId = req.params.userId;
     const nickname = req.body.nickname;
@@ -155,22 +153,13 @@ exports.patchUsers = async function (req, res) {
     if (userIdFromJWT != userId) {
         res.send(errResponse(baseResponse.USER_ID_NOT_MATCH));
     } else {
-        if (!nickname) return res.send(errResponse(baseResponse.USER_NICKNAME_EMPTY));
+        if (!nickname)
+            return res.send(errResponse(baseResponse.USER_NICKNAME_EMPTY));
 
-        const editUserInfo = await userService.editUser(userId, nickname)
+        const editUserInfo = await userService.editUser(userId, nickname);
         return res.send(editUserInfo);
     }
 };
-
-
-
-
-
-
-
-
-
-
 
 /** JWT 토큰 검증 API
  * [GET] /app/auto-login
@@ -179,4 +168,22 @@ exports.check = async function (req, res) {
     const userIdResult = req.verifiedToken.userId;
     console.log(userIdResult);
     return res.send(response(baseResponse.TOKEN_VERIFICATION_SUCCESS));
+};
+
+/*
+ * API No. 1.4 유저삭제
+ * API Name : 유저 삭제
+ * [PATCH] /users/:userIdx/status
+ * path variable : userIdx
+ */
+exports.delete = async function (req, res) {
+    const userIdx = req.params.userIdx;
+    if (!userIdx) {
+        return res.send(errResponse(baseResponse.USER_USERIDX_EMPTY));
+    }
+    if (userIdx <= 0) {
+        return res.send(errResponse(baseResponse.USER_USERIDX_LENGTH));
+    }
+    const deleteUserResponse = await userService.deleteUser(userIdx);
+    return res.send(deleteUserResponse);
 };
